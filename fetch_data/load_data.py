@@ -5,7 +5,7 @@ import pandas as pd
 Project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 Default_save_path = os.path.join(Project_root, "data", "raw", "btc_raw.csv")
 
-def fetch_btcdata(period="2y", save_path=Default_save_path):
+def fetch_btcdata(period="10y", save_path=Default_save_path):
 
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     

@@ -68,7 +68,8 @@ def train_numeric_model():
     final_model.fit(X_train, y_train)
     
 
-    y_pred = final_model.predict(X_test)
+    y_probs = model.predict_proba(X_test)[:, 1]
+    y_pred = (y_probs > 0.48).astype(int)
     test_acc = accuracy_score(y_test, y_pred)
     test_f1 = f1_score(y_test, y_pred)
     
