@@ -1,10 +1,11 @@
 import os
-import joblib
+import xgboost as xgb
 import pandas as pd
+import numpy as np
 from llm_sentiment import analyze_sentiment_with_llm
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODEL_PATH = os.path.join(PROJECT_ROOT, "models", "xgboost_btc.joblib")
+MODEL_PATH = os.path.join(PROJECT_ROOT, "models", "xgboost_model.json")
 DATA_PATH = os.path.join(PROJECT_ROOT, "data", "processed", "btc_features.csv")
 
 def get_latest_technical_signal():
@@ -15,14 +16,18 @@ def get_latest_technical_signal():
         print("Model or feature data not found. Using fallback neutral technical signal.")
         return 0.5  # Neutral probability
 
-    model = joblib.load(MODEL_PATH)
+    model = xgb.Booster()
+    model.load_model(MODEL_PATH)
     df = pd.read_csv(DATA_PATH)
     
     # Get the most recent row of indicators
-    latest_features = df.drop(columns=['Date', 'Target'], errors='ignore').iloc[[-1]]
+    feature_cols = ["rsi","sma_20","ema_50","macd","macd_signal","bb_upper","bb_lower",
+                    "daily_return","return_lag1","return_lag2","volume_lag1","FundingRate","OI_Change_Pct"]
+    latest_features = df[feature_cols].iloc[[-1]]
     
     # Probability of price going UP
-    prob_up = model.predict_proba(latest_features)[0][1]
+    dtest = xgb.DMatrix(latest_features)
+    prob_up = model.predict(dtest)[0]
     return prob_up
 
 def run_hybrid_prediction():

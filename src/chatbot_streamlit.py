@@ -83,7 +83,7 @@ def main():
         st.markdown("- BTC Price: Yahoo Finance")
         st.markdown("- Derivatives: Binance API")
         st.markdown("- News: RSS (CoinTelegraph, CoinDesk, etc.)")
-        st.markdown("- LLM: Groq Llama-3.1-8B")
+        st.markdown("- LLM: Groq qwen/qwen3.6-27b")
     
     # Load analysis
     with st.spinner("Loading latest market analysis..."):
@@ -120,7 +120,7 @@ def main():
         with st.chat_message("assistant"):
             with st.spinner("Analyzing..."):
                 response = client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
+                    model="qwen/qwen3.6-27b",
                     messages=messages,
                     temperature=0.3,
                     max_tokens=500

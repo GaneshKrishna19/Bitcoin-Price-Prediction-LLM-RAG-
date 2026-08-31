@@ -72,7 +72,7 @@ class BitcoinChatbot:
         ] + self.conversation_history[-10:]  # Keep last 10 exchanges
         
         response = self.client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="qwen/qwen3.6-27b",
             messages=messages,
             temperature=0.3,
             max_tokens=500
