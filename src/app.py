@@ -16,12 +16,17 @@ from contextlib import redirect_stdout
 from datetime import datetime, timedelta
 import joblib
 import xgboost as xgb
+import chromadb
+from chromadb.utils import embedding_functions
 
 load_dotenv()
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CHROMA_DB_PATH = os.path.join(PROJECT_ROOT, "data", "chroma_db")
+
 st.set_page_config(
     page_title="₿ Bitcoin Analyst Pro",
-    page_icon="₿",
+    page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -382,42 +387,78 @@ def render_chat(analysis):
     if "messages" not in st.session_state:
         st.session_state.messages = []
     
+    # Display historical chat messages
     for msg in st.session_state.messages:
-        with st.chat_message(msg["role"], avatar="🧑" if msg["role"] == "user" else "₿"):
+        with st.chat_message(msg["role"], avatar="🧑" if msg["role"] == "user" else "💰"):
             st.markdown(msg["content"])
-    
+
     if prompt := st.chat_input("Ask about Bitcoin outlook, methodology, news impact, technical levels..."):
+        # 1. Display and record user prompt
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user", avatar="🧑"):
             st.markdown(prompt)
         
-        client = get_groq_client()
-        
+        # 2. RAG RETRIEVAL: Query ChromaDB for relevant context
+        retrieved_context = ""
+        try:
+            # Native ChromaDB Client & Embedding setup
+            chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+            embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
+                model_name="all-MiniLM-L6-v2"
+            )
+            
+            # Fetch collection (adjust collection_name to match your setup)
+            collection = chroma_client.get_collection(
+                name="bitcoin_news", 
+                embedding_function=embedding_fn
+            )
+            
+            # Query top 3 nearest matching text chunks for user prompt
+            results = collection.query(
+                query_texts=[prompt],
+                n_results=3
+            )
+            
+            if results and results.get("documents") and len(results["documents"][0]) > 0:
+                retrieved_context = "\n\n".join(results["documents"][0])
+            else:
+                retrieved_context = "No relevant context found in database."
+        except Exception as e:
+            retrieved_context = f"Could not retrieve context: {str(e)}"
+
+        # 3. Construct System Prompt with Dynamic RAG Context
         system_prompt = (
             "You are a Bitcoin market analyst assistant with access to:\n"
             "1. Hybrid quantitative (XGBoost) + sentiment (LLM+RAG) analysis\n"
-            "2. Recent news articles via vector search\n"
+            "2. Retrieved vector context matching the user's question\n"
             "3. Latest model prediction output\n\n"
             f"Current Market Context:\n"
             f"Latest Prediction:\n{analysis['prediction_output']}\n\n"
             f"Sentiment Analysis: {json.dumps(analysis['sentiment'], indent=2)}\n\n"
-            "Recent News:\n" +
+            "Recent News Baseline:\n" +
             "\n".join([f"- {a['title']} ({a['published']})" for a in analysis['news']]) +
-            "\n\nAnswer questions about Bitcoin outlook, explain methodology, "
-            "discuss news impact, or provide educational context. "
+            f"\n\nRetrieved Relevant Knowledge (RAG Context):\n{retrieved_context}\n\n"
+            "Answer questions using the provided analysis and retrieved knowledge context. "
             "Be concise, informative, and always clarify this is not financial advice."
         )
         
-        messages = [
-            {"role": "system", "content": system_prompt}
-        ] + st.session_state.messages[-10:]
+        # 4. Append conversational history (limiting context window to last 10 messages)
+        history_messages = [
+            {"role": m["role"], "content": m["content"]} 
+            for m in st.session_state.messages[-10:]
+        ]
         
-        with st.chat_message("assistant", avatar="₿"):
-            with st.spinner("Analyzing..."):
+        messages = [{"role": "system", "content": system_prompt}] + history_messages
+        
+        # 5. Generate LLM response
+        client = get_groq_client()
+        with st.chat_message("assistant", avatar="💰"):
+            with st.spinner("Analyzing market context..."):
                 response = client.chat.completions.create(
-                    model="qwen/qwen3.6-27b",
+                    model="openai/gpt-oss-safeguard-20b",
                     messages=messages,
                     temperature=0.3,
+                    include_reasoning=False,
                     max_tokens=600
                 )
                 reply = response.choices[0].message.content

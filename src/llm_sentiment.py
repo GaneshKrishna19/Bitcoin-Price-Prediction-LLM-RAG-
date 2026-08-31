@@ -35,7 +35,7 @@ def analyze_sentiment_with_llm(query="What is the latest Bitcoin market sentimen
     client = Groq(api_key=os.getenv("GROQ_API_KEY"))
     
     response = client.chat.completions.create(
-        model="qwen/qwen3.6-27b",
+        model="openai/gpt-oss-safeguard-20b",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
